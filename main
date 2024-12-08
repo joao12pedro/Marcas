@@ -1,0 +1,120 @@
+#include <LiquidCrystal.h>
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+// Pinos dos sensores
+int pinosensor_25 = 6;  // 25 centavos
+int pinosensor_1 = 7;   // 1 real
+int pinosensor_10 = 8;  // 10 centavos
+int pinosensor_5 = 9;   // 5 centavos
+int pinosensor_50 = 10; // 50 centavos
+
+// Contadores de moedas
+int contador_25 = 0;
+int contador_1 = 0;
+int contador_10 = 0;
+int contador_5 = 0;
+int contador_50 = 0;
+
+// Estados dos sensores
+int valor_sensor_25 = 0;
+int valor_sensor_1 = 0;
+int valor_sensor_10 = 0;
+int valor_sensor_5 = 0;
+int valor_sensor_50 = 0;
+
+bool s_high_25 = false;
+bool s_high_1 = false;
+bool s_high_10 = false;
+bool s_high_5 = false;
+bool s_high_50 = false;
+
+unsigned long debounceDelay = 100; // Tempo de debounce
+unsigned long ultimoTempoLeitura_25 = 0;
+unsigned long ultimoTempoLeitura_1 = 0;
+unsigned long ultimoTempoLeitura_10 = 0;
+unsigned long ultimoTempoLeitura_5 = 0;
+unsigned long ultimoTempoLeitura_50 = 0;
+
+// Valores das moedas
+float valor_total = 0.0;
+float valor_25 = 0.25;
+float valor_1 = 1.0;
+float valor_10 = 0.10;
+float valor_5 = 0.05;
+float valor_50 = 0.50;
+
+void setup() {
+  lcd.begin(16, 2);
+  Serial.begin(9600);
+
+  // Configura os pinos dos sensores como entrada
+  pinMode(pinosensor_25, INPUT);
+  pinMode(pinosensor_1, INPUT);
+  pinMode(pinosensor_10, INPUT);
+  pinMode(pinosensor_5, INPUT);
+  pinMode(pinosensor_50, INPUT);
+
+  // Inicializa o LCD
+  lcd.print("Ja contei: 0");
+  lcd.setCursor(0, 1);
+  lcd.print("Valor: R$ 0.00");
+}
+
+void loop() {
+  unsigned long tempoAtual = millis();
+
+  // Leitura e tratamento de cada sensor
+  tratarSensor(pinosensor_25, valor_sensor_25, s_high_25, ultimoTempoLeitura_25, tempoAtual, contador_25, valor_25);
+  tratarSensor(pinosensor_1, valor_sensor_1, s_high_1, ultimoTempoLeitura_1, tempoAtual, contador_1, valor_1);
+  tratarSensor(pinosensor_10, valor_sensor_10, s_high_10, ultimoTempoLeitura_10, tempoAtual, contador_10, valor_10);
+  tratarSensor(pinosensor_5, valor_sensor_5, s_high_5, ultimoTempoLeitura_5, tempoAtual, contador_5, valor_5);
+  tratarSensor(pinosensor_50, valor_sensor_50, s_high_50, ultimoTempoLeitura_50, tempoAtual, contador_50, valor_50);
+
+  // Debug no monitor serial
+  Serial.print("Contagem 25 centavos: ");
+  Serial.println(contador_25);
+  Serial.print("Contagem 1 real: ");
+  Serial.println(contador_1);
+  Serial.print("Contagem 10 centavos: ");
+  Serial.println(contador_10);
+  Serial.print("Contagem 5 centavos: ");
+  Serial.println(contador_5);
+  Serial.print("Contagem 50 centavos: ");
+  Serial.println(contador_50);
+  Serial.print("Valor total: R$");
+  Serial.println(valor_total, 2);
+}
+
+// Função para tratar a leitura de cada sensor
+void tratarSensor(int pino, int &valor_sensor, bool &s_high, unsigned long &ultimoTempoLeitura, unsigned long tempoAtual, int &contador, float valor_moeda) {
+  int leituraAtual = digitalRead(pino);
+
+  if (leituraAtual != valor_sensor && (tempoAtual - ultimoTempoLeitura) > debounceDelay) {
+    valor_sensor = leituraAtual;
+    ultimoTempoLeitura = tempoAtual;
+
+    if (valor_sensor == LOW && !s_high) {
+      s_high = true; // Marca que o sensor foi ativado
+    } else if (valor_sensor == HIGH && s_high) {
+      s_high = false;
+      contador++;          // Incrementa o contador da moeda correspondente
+      valor_total += valor_moeda; // Atualiza o valor total
+      atualizaLCD();       // Atualiza o LCD
+    }
+  }
+}
+
+// Função para atualizar o LCD
+void atualizaLCD() {
+  // Atualiza a contagem total no LCD
+  lcd.setCursor(11, 0);
+  lcd.print("   ");
+  lcd.setCursor(11, 0);
+  lcd.print(contador_25 + contador_1 + contador_10 + contador_5 + contador_50);
+
+  // Atualiza o valor total no LCD
+  lcd.setCursor(9, 1);
+  lcd.print("       ");
+  lcd.setCursor(9, 1);
+  lcd.print(valor_total, 2);
+}
