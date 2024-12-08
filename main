@@ -1,120 +1,192 @@
-#include <LiquidCrystal.h>
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
-// Pinos dos sensores
-int pinosensor_25 = 6;  // 25 centavos
-int pinosensor_1 = 7;   // 1 real
-int pinosensor_10 = 8;  // 10 centavos
-int pinosensor_5 = 9;   // 5 centavos
-int pinosensor_50 = 10; // 50 centavos
+Future<List<Marca>> fetchMarca() async {
+  final response =
+      await http.get(Uri.parse('https://arquivos.ectare.com.br/marcas.json'));
 
-// Contadores de moedas
-int contador_25 = 0;
-int contador_1 = 0;
-int contador_10 = 0;
-int contador_5 = 0;
-int contador_50 = 0;
-
-// Estados dos sensores
-int valor_sensor_25 = 0;
-int valor_sensor_1 = 0;
-int valor_sensor_10 = 0;
-int valor_sensor_5 = 0;
-int valor_sensor_50 = 0;
-
-bool s_high_25 = false;
-bool s_high_1 = false;
-bool s_high_10 = false;
-bool s_high_5 = false;
-bool s_high_50 = false;
-
-unsigned long debounceDelay = 100; // Tempo de debounce
-unsigned long ultimoTempoLeitura_25 = 0;
-unsigned long ultimoTempoLeitura_1 = 0;
-unsigned long ultimoTempoLeitura_10 = 0;
-unsigned long ultimoTempoLeitura_5 = 0;
-unsigned long ultimoTempoLeitura_50 = 0;
-
-// Valores das moedas
-float valor_total = 0.0;
-float valor_25 = 0.25;
-float valor_1 = 1.0;
-float valor_10 = 0.10;
-float valor_5 = 0.05;
-float valor_50 = 0.50;
-
-void setup() {
-  lcd.begin(16, 2);
-  Serial.begin(9600);
-
-  // Configura os pinos dos sensores como entrada
-  pinMode(pinosensor_25, INPUT);
-  pinMode(pinosensor_1, INPUT);
-  pinMode(pinosensor_10, INPUT);
-  pinMode(pinosensor_5, INPUT);
-  pinMode(pinosensor_50, INPUT);
-
-  // Inicializa o LCD
-  lcd.print("Ja contei: 0");
-  lcd.setCursor(0, 1);
-  lcd.print("Valor: R$ 0.00");
-}
-
-void loop() {
-  unsigned long tempoAtual = millis();
-
-  // Leitura e tratamento de cada sensor
-  tratarSensor(pinosensor_25, valor_sensor_25, s_high_25, ultimoTempoLeitura_25, tempoAtual, contador_25, valor_25);
-  tratarSensor(pinosensor_1, valor_sensor_1, s_high_1, ultimoTempoLeitura_1, tempoAtual, contador_1, valor_1);
-  tratarSensor(pinosensor_10, valor_sensor_10, s_high_10, ultimoTempoLeitura_10, tempoAtual, contador_10, valor_10);
-  tratarSensor(pinosensor_5, valor_sensor_5, s_high_5, ultimoTempoLeitura_5, tempoAtual, contador_5, valor_5);
-  tratarSensor(pinosensor_50, valor_sensor_50, s_high_50, ultimoTempoLeitura_50, tempoAtual, contador_50, valor_50);
-
-  // Debug no monitor serial
-  Serial.print("Contagem 25 centavos: ");
-  Serial.println(contador_25);
-  Serial.print("Contagem 1 real: ");
-  Serial.println(contador_1);
-  Serial.print("Contagem 10 centavos: ");
-  Serial.println(contador_10);
-  Serial.print("Contagem 5 centavos: ");
-  Serial.println(contador_5);
-  Serial.print("Contagem 50 centavos: ");
-  Serial.println(contador_50);
-  Serial.print("Valor total: R$");
-  Serial.println(valor_total, 2);
-}
-
-// Função para tratar a leitura de cada sensor
-void tratarSensor(int pino, int &valor_sensor, bool &s_high, unsigned long &ultimoTempoLeitura, unsigned long tempoAtual, int &contador, float valor_moeda) {
-  int leituraAtual = digitalRead(pino);
-
-  if (leituraAtual != valor_sensor && (tempoAtual - ultimoTempoLeitura) > debounceDelay) {
-    valor_sensor = leituraAtual;
-    ultimoTempoLeitura = tempoAtual;
-
-    if (valor_sensor == LOW && !s_high) {
-      s_high = true; // Marca que o sensor foi ativado
-    } else if (valor_sensor == HIGH && s_high) {
-      s_high = false;
-      contador++;          // Incrementa o contador da moeda correspondente
-      valor_total += valor_moeda; // Atualiza o valor total
-      atualizaLCD();       // Atualiza o LCD
-    }
+  if (response.statusCode == 200) {
+    return (json.decode(utf8.decode(response.bodyBytes)) as List)
+        .map((i) => Marca.fromJson(i))
+        .toList();
+  } else {
+    throw Exception('Failed to load Marca');
   }
 }
 
-// Função para atualizar o LCD
-void atualizaLCD() {
-  // Atualiza a contagem total no LCD
-  lcd.setCursor(11, 0);
-  lcd.print("   ");
-  lcd.setCursor(11, 0);
-  lcd.print(contador_25 + contador_1 + contador_10 + contador_5 + contador_50);
+class Marca {
+  final String nome;
+  final String setor;
+  final int fundacao;
+  final String paisOrigem;
 
-  // Atualiza o valor total no LCD
-  lcd.setCursor(9, 1);
-  lcd.print("       ");
-  lcd.setCursor(9, 1);
-  lcd.print(valor_total, 2);
+  Marca({
+    required this.nome,
+    required this.setor,
+    required this.fundacao,
+    required this.paisOrigem,
+  });
+
+  factory Marca.fromJson(Map<String, dynamic> json) {
+    return Marca(
+      nome: json['nome'],
+      setor: json['setor'],
+      fundacao: json['fundacao'],
+      paisOrigem: json['pais_origem'],
+    );
+  }
+}
+
+void main() => runApp(MyApp());
+
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late Future<List<Marca>> futureMarca;
+
+  @override
+  void initState() {
+    super.initState();
+    futureMarca = fetchMarca();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Marcas Mundiais',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Marcas Mundiais',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.blueAccent,
+        ),
+        body: Container(
+          color: Colors.grey[200],
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: FutureBuilder<List<Marca>>(
+              future: futureMarca,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return CircularProgressIndicator();
+                } else if (snapshot.hasError) {
+                  return Text(
+                    'Erro: ${snapshot.error}',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 16,
+                    ),
+                  );
+                } else {
+                  final data = snapshot.data!;
+                  return Card(
+                    elevation: 5,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columnSpacing: 20,
+                          headingRowColor: MaterialStateColor.resolveWith(
+                              (states) => Colors.blueAccent),
+                          dataRowColor: MaterialStateColor.resolveWith(
+                              (states) => Colors.white),
+                          border: TableBorder.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
+                          columns: [
+                            DataColumn(
+                              label: Text(
+                                'Nome',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Setor',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Fundação',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'País de Origem',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                          rows: data
+                              .map(
+                                (marca) => DataRow(
+                                  cells: [
+                                    DataCell(Text(
+                                      marca.nome,
+                                      style: TextStyle(fontSize: 14),
+                                    )),
+                                    DataCell(Text(
+                                      marca.setor,
+                                      style: TextStyle(fontSize: 14),
+                                    )),
+                                    DataCell(Text(
+                                      marca.fundacao.toString(),
+                                      style: TextStyle(fontSize: 14),
+                                    )),
+                                    DataCell(Text(
+                                      marca.paisOrigem,
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                          fontStyle: FontStyle.italic),
+                                    )),
+                                  ],
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
